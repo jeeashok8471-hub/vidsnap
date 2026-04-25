@@ -13,7 +13,7 @@ app.use(express.static('public'));
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'VidSnap API chal rahi hai! 🚀' });
+  res.json({ status: 'ok', message: 'VidSnap chal rahi hai!' });
 });
 
 // Get video info
@@ -31,7 +31,8 @@ app.post('/api/info', (req, res) => {
     return res.status(400).json({ error: 'Sirf YouTube ya Instagram links allowed hain!' });
   }
 
-  const cmd = `yt-dlp --dump-json --no-playlist "${url}"`;
+  // FIXED: python3 -m yt_dlp instead of yt-dlp
+  const cmd = `python3 -m yt_dlp --dump-json --no-playlist "${url}"`;
 
   exec(cmd, { timeout: 30000 }, (error, stdout, stderr) => {
     if (error) {
@@ -47,16 +48,13 @@ app.post('/api/info', (req, res) => {
         .map(f => ({
           format_id: f.format_id,
           ext: f.ext,
-          quality: f.format_note || f.height ? `${f.height}p` : 'audio',
+          quality: f.format_note || (f.height ? `${f.height}p` : 'audio'),
           filesize: f.filesize ? Math.round(f.filesize / 1024 / 1024) + ' MB' : '~',
           hasVideo: f.vcodec !== 'none',
           hasAudio: f.acodec !== 'none',
           height: f.height || 0,
         }))
-        .filter((f, i, arr) => {
-          // Remove duplicates by quality
-          return arr.findIndex(x => x.quality === f.quality) === i;
-        })
+        .filter((f, i, arr) => arr.findIndex(x => x.quality === f.quality) === i)
         .sort((a, b) => b.height - a.height)
         .slice(0, 8);
 
@@ -93,7 +91,8 @@ app.post('/api/download', (req, res) => {
     formatArg = `-f "bestaudio" -x --audio-format mp3`;
   }
 
-  const cmd = `yt-dlp ${formatArg} --merge-output-format mp4 -o "${outputPath}.%(ext)s" "${url}"`;
+  // FIXED: python3 -m yt_dlp instead of yt-dlp
+  const cmd = `python3 -m yt_dlp ${formatArg} --merge-output-format mp4 -o "${outputPath}.%(ext)s" "${url}"`;
 
   exec(cmd, { timeout: 120000 }, (error, stdout, stderr) => {
     if (error) {
@@ -101,7 +100,6 @@ app.post('/api/download', (req, res) => {
       return res.status(500).json({ error: 'Download fail ho gayi!' });
     }
 
-    // Find the downloaded file
     const files = fs.readdirSync(tmpDir).filter(f => f.startsWith(filename));
     if (files.length === 0) {
       return res.status(500).json({ error: 'File nahi mili!' });
@@ -116,17 +114,11 @@ app.post('/api/download', (req, res) => {
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
 
-    stream.on('end', () => {
-      fs.unlinkSync(filePath); // cleanup
-    });
-
-    stream.on('error', () => {
-      res.status(500).json({ error: 'File stream error!' });
-    });
+    stream.on('end', () => { try { fs.unlinkSync(filePath); } catch(e){} });
+    stream.on('error', () => { res.status(500).json({ error: 'File stream error!' }); });
   });
 });
 
-// Helpers
 function formatDuration(seconds) {
   if (!seconds) return '–';
   const m = Math.floor(seconds / 60);
@@ -142,5 +134,5 @@ function formatViews(views) {
 }
 
 app.listen(PORT, () => {
-  console.log(`✅ VidSnap server chal raha hai port ${PORT} pe!`);
+  console.log(`VidSnap server chal raha hai port ${PORT} pe!`);
 });
