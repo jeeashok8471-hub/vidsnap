@@ -12,7 +12,7 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // yt-dlp binary path from npm package
-const YTDLP = path.join(__dirname, 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp');
+const YTDLP = path.join(__dirname, 'node_modules', 'yt-dlp-nodejs', 'bin', 'yt-dlp');
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
